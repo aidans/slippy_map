@@ -1,0 +1,51 @@
+package org.gicentre.utils.slippymap;
+
+import java.awt.geom.Rectangle2D;
+
+//****************************************************************************************
+/** Represents a lon/lat bounding box. Simply as a Rectangle2D.Double with a more
+ * intuitive constructor 
+ * 
+*  @author Aidan Slingsby, giCentre, City University London.
+*  @version 1.0, August 2010 
+*/ 
+//*****************************************************************************************
+
+/* This file is part of giCentre utilities library. gicentre.utils is free software: you can 
+* redistribute it and/or modify it under the terms of the GNU Lesser General Public License
+* as published by the Free Software Foundation, either version 3 of the License, or (at your
+* option) any later version.
+* 
+* gicentre.utils is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+* without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+* See the GNU Lesser General Public License for more details.
+* 
+* You should have received a copy of the GNU Lesser General Public License along with this
+* source code (see COPYING.LESSER included with this source code). If not, see 
+* http://www.gnu.org/licenses/.
+*/
+
+@SuppressWarnings("serial")
+public class LonLatBounds extends Rectangle2D.Double{
+	
+	/** Constructor
+	 * Doesn't matter which way round lat1 & lat2 and lon1 & lon2 are
+	 * @param lon1  Either max or min longitude
+	 * @param lat1  Either (max or min) latitude
+	 * @param lon2  Either max or min longitude
+	 * @param lat2  Either max or min latitude
+	 */
+	public LonLatBounds(double lon1,double lat1, double lon2, double lat2) {
+		super(Math.min(lon1,lon2),Math.min(lat1,lat2),Math.abs(lon1-lon2),Math.abs(lat1-lat2));
+	}
+
+	/** Constructor
+	 * Creates a "bounding box" of zero width and height
+	 * @param lon  Longitude
+	 * @param lat  Latitude
+	 */
+	public LonLatBounds(double lon,double lat) {
+		super(lon,lat,0,0);
+	}
+
+}

@@ -1,0 +1,245 @@
+package org.gicentre.utils.slippymap;
+
+import java.awt.Image;
+import java.awt.MediaTracker;
+import java.awt.Toolkit;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.imageio.ImageIO;
+import javax.imageio.stream.FileImageInputStream;
+import javax.xml.ws.http.HTTPException;
+
+import processing.core.PApplet;
+import processing.core.PImage;
+
+//****************************************************************************************
+/** Class which retrieves and caches maptiles in its own thread.
+*    
+* Only intended to be used by SlippyMap - hence Class and all methods have only
+* package-wide visibility
+*  
+* @author Aidan Slingsby, giCentre, City University London.
+* @version 1.0, August 2011 
+*/ 
+//*****************************************************************************************
+
+/* This file is part of giCentre utilities library. gicentre.utils is free software: you can 
+* redistribute it and/or modify it under the terms of the GNU Lesser General Public License
+* as published by the Free Software Foundation, either version 3 of the License, or (at your
+* option) any later version.
+* 
+* gicentre.utils is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+* without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+* See the GNU Lesser General Public License for more details.
+* 
+* You should have received a copy of the GNU Lesser General Public License along with this
+* source code (see COPYING.LESSER included with this source code). If not, see 
+* http://www.gnu.org/licenses/.
+*/
+
+class TileRetriever extends Thread{
+
+	List<String> urls=Collections.synchronizedList(new LinkedList<String>()); //list of URLs to retrieve
+	Map<String, PImage> cachedTiles; //in-memory cache for tiles
+	PApplet applet;
+	Set<SlippyMapListener> slippyMapListeners; //listeners to inform about whether there are tiles available
+	PImage noInternetImage; //blank image for where tile has not been successfully retrieved
+	boolean useFileCache=true; //whether or not to use a file-based cache for tiles
+	
+	/** Constructor
+	 * 
+	 * @param applet The sketch
+	 * @param cachedTiles The tile cache to use
+	 */
+	TileRetriever(PApplet applet,Map<String, PImage> cachedTiles){
+		this.cachedTiles=cachedTiles;
+		this.applet=applet;
+		this.start(); //start the thread
+	}
+	
+	/** Sets whether or not to use the file-based cache
+	 * 
+	 * @param useFileCache
+	 */
+	void setUseFileCache(boolean useFileCache){
+		this.useFileCache=useFileCache;
+	}
+	
+	/** Thread which retrieves tiles from the URL list
+	 * 
+	 */
+	public void run(){
+		while (true){ //run forever
+			while (!urls.isEmpty()){
+				String url = urls.remove(0); //take the first URL
+				PImage image=null;
+				String tileFileName=url.replaceAll("[&%$*:/\\\\\\?]", "_"); //generate a filename for the file-based cache
+				String pathFileName="data/tilecache"+File.separatorChar+tileFileName;
+				try{
+					if (new File(pathFileName).exists()) //try to load from disk
+						image=loadImage(pathFileName);
+				}
+				catch (Exception e) {
+					// silently handle
+				}
+				try{
+					if (image==null){
+						image=applet.loadImage(url); //otherwise, try to load from URL
+					}
+					if (image.width<=0) //if invalid image, set to null
+						image=null;
+					if (image!=null && useFileCache){
+						image.save(pathFileName); //save to the file-based cache
+					}
+				}
+				catch (Exception e) {
+					// silently handle
+				}
+				if (image==null){
+					//then internet is down
+					if (noInternetImage==null){
+						noInternetImage=new PImage(250, 250);
+					}
+					image=noInternetImage;
+					System.err.println("Using nointernetimage");
+				}
+
+				if (image!=noInternetImage){
+					cachedTiles.put(url, image); //add to in-memory cache
+					if (slippyMapListeners!=null) //notify all the listeners that a new tile is available
+						for (SlippyMapListener slippyMapListener:slippyMapListeners){
+							slippyMapListener.newTileAvailable();
+						}
+				}
+				//pause the thread if there are no more tiles to get
+				if (urls.isEmpty()){
+					try {
+						synchronized (this) {
+							this.wait();
+						}
+					} catch (InterruptedException e) {
+						//silently handle
+					}
+				}
+			}
+		}
+	}
+
+	/** Adds a slippy map listener
+	 * 
+	 * @param slippyMapListener
+	 */
+	void addSlippyMapListener(SlippyMapListener slippyMapListener){
+		if (this.slippyMapListeners==null)
+			this.slippyMapListeners=new HashSet<SlippyMapListener>();
+		this.slippyMapListeners.add(slippyMapListener);
+	}
+
+	/**Removes a slippy map listener
+	 * 
+	 * @param slippyMapListener
+	 */
+	void removeSlippyMapListener(SlippyMapListener slippyMapListener){
+		if (this.slippyMapListeners!=null)
+			this.slippyMapListeners.remove(slippyMapListener);
+	}
+
+	/** queue URL for retrieval
+	 * 
+	 * @param url
+	 */
+	void retrieve(String url){
+		synchronized (urls) {
+			urls.remove(url);//remove if it is already there.
+			urls.add(0,url);//put at top
+			synchronized (this) {
+				this.notify();
+			}
+			//don't let this list become too big
+			if (urls.size()>30)
+				urls.remove(urls.size()-1);
+		}
+	}
+	
+	
+	
+	/**
+	   * @nowebref
+	   */
+	  public PImage loadImage(String filename) {
+	  
+
+	    // For jpeg, gif, and png, load them using createImage(),
+	    // because the javax.imageio code was found to be much slower, see
+	    // <A HREF="http://dev.processing.org/bugs/show_bug.cgi?id=392">Bug 392</A>.
+	    try {
+	     {
+	        byte bytes[] = loadBytes(new FileInputStream(filename));
+	        if (bytes == null) {
+	          return null;
+	        } else {
+	          Image awtImage = Toolkit.getDefaultToolkit().createImage(bytes);
+	          PImage image = loadImageMT(awtImage);
+	          if (image.width == -1) {
+	            return null;
+	          }
+
+	          return image;
+	        }
+	      }
+	    } catch (Exception e) {
+	      // show error, but move on to the stuff below, see if it'll work
+//	      e.printStackTrace();
+	    }
+	   return null;
+	  }
+
+	  static public byte[] loadBytes(InputStream input) {
+		    try {
+		      BufferedInputStream bis = new BufferedInputStream(input);
+		      ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+		      int c = bis.read();
+		      while (c != -1) {
+		        out.write(c);
+		        c = bis.read();
+		      }
+		      return out.toByteArray();
+
+		    } catch (IOException e) {
+//		      e.printStackTrace();
+		      //throw new RuntimeException("Couldn't load bytes from stream");
+		    }
+		    return null;
+		  }
+	  
+	  /**
+	   * Load an AWT image synchronously by setting up a MediaTracker for
+	   * a single image, and blocking until it has loaded.
+	   */
+	  protected PImage loadImageMT(Image awtImage) {
+	    MediaTracker tracker = new MediaTracker(applet);
+	    tracker.addImage(awtImage, 0);
+	    try {
+	      tracker.waitForAll();
+	    } catch (InterruptedException e) {
+	      //e.printStackTrace();  // non-fatal, right?
+	    }
+
+	    PImage image = new PImage(awtImage);
+	    image.parent = applet;
+	    return image;
+	  }
+
+}

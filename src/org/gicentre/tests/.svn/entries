@@ -1,0 +1,52 @@
+8
+
+dir
+266
+svn+ssh://vega.soi.city.ac.uk/export/SOI-50/svn/giCentre/slippy_map/src/org/gicentre/tests
+svn+ssh://vega.soi.city.ac.uk/export/SOI-50/svn/giCentre
+
+
+
+2011-08-15T15:11:37.349337Z
+266
+sbbb717
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+43e10c30-b2bd-4471-a654-360bdc810134
+
+SlippyMapTest.java
+file
+281
+
+
+
+2012-01-04T00:40:26.000000Z
+36d573690ea117721d8383b03d987974
+2012-01-16T18:10:41.372970Z
+281
+sbbb717
+
+SlippyMapWithPointTest.java
+file
+
+
+
+
+2011-08-15T10:57:11.000000Z
+534d5b7957593f5575a28f9217d0caef
+2011-08-15T15:11:37.349337Z
+266
+sbbb717
+
